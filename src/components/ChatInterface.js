@@ -13,26 +13,25 @@ export const ChatInterface = ({ onClose, currentUser }) => {
   const [newMessage, setNewMessage] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState(null);
-
   useEffect(() => {
     if (!chatId) {
       setError('No chat ID available');
       setIsLoading(false);
       return;
     }
-
+  
     let unsubscribe;
     const loadMessages = async () => {
       try {
-        // Fetch all messages without role filtering
         const initialMessages = await firebaseService.fetchDisputeMessages(chatId);
+        console.log('Initial messages:', initialMessages); // Log messages
         setMessages(initialMessages);
         setIsLoading(false);
-
-        // Set up real-time listener for all messages
+  
         unsubscribe = firebaseService.listenToDisputeMessages(
           chatId,
           (updatedMessages) => {
+            console.log('Updated messages:', updatedMessages); // Log updated messages
             setMessages(updatedMessages);
           },
           (err) => {
@@ -46,16 +45,72 @@ export const ChatInterface = ({ onClose, currentUser }) => {
         setIsLoading(false);
       }
     };
-
+  
     loadMessages();
-
-    // Cleanup function
+  
     return () => {
       if (unsubscribe) {
         unsubscribe();
       }
     };
   }, [chatId]);
+  
+  const renderMessage = (msg) => {
+    const isOwnMessage = msg.senderId === currentUser?.uid;
+  
+    return (
+      <div
+        key={msg.id}
+        className={`mb-4 ${isOwnMessage ? 'text-right' : 'text-left'}`}
+      >
+        <div
+          className={`inline-block p-2 rounded ${
+            isOwnMessage ? 'bg-blue-100' : 'bg-gray-100'
+          }`}
+        >
+          {/* Text message */}
+          {msg.message && (
+            <p className="text-sm">
+              <span className="font-semibold mr-2">
+                {isOwnMessage ? 'You' : msg.senderName || 'Customer'}:
+              </span>
+              {msg.message}
+            </p>
+          )}
+  
+          {/* File preview */}
+          {msg.fileURL && (
+            <div className="file-preview mt-2">
+              {msg.fileType?.startsWith('image/') ? (
+                <img
+                  src={msg.fileURL}
+                  alt={msg.fileName || 'Attachment'}
+                  className="max-w-full h-auto rounded cursor-pointer"
+                  onClick={() => window.open(msg.fileURL, '_blank')}
+                />
+              ) : (
+                <a
+                  href={msg.fileURL}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-blue-600 hover:underline"
+                >
+                  {msg.fileName || 'Download File'}
+                </a>
+              )}
+            </div>
+          )}
+  
+          <small className="text-gray-500 text-xs">
+            {msg.timestamp instanceof Date
+              ? msg.timestamp.toLocaleString()
+              : new Date(msg.timestamp).toLocaleString()}
+          </small>
+        </div>
+      </div>
+    );
+  };
+  
 
   const handleSendMessage = async (e) => {
     e.preventDefault();
@@ -105,7 +160,6 @@ export const ChatInterface = ({ onClose, currentUser }) => {
       </div>
     );
   }
-
   return (
     <div className="chat-interface">
       <div className="chat-header">
@@ -114,54 +168,62 @@ export const ChatInterface = ({ onClose, currentUser }) => {
       </div>
 
       <div className="messages-container">
-        {/* {messages.map((msg) => (
-          <div 
-            key={msg.id} 
-            className={`message ${msg.type === 'support' ? 'support-message' : 'user-message'}`}
-          >
-            <div className="message-content">
-              <span className="sender">
-                {msg.type === 'support' ? 'Support' : 'Customer'}
-              </span>
-              <p>{msg.message}</p>
+        {messages.map(msg => {
+          const isOwnMessage = msg.senderId === currentUser?.uid;
+          
+          return (
+            <div
+              key={msg.id}
+              className={`mb-4 ${isOwnMessage ? 'text-right' : 'text-left'}`}
+            >
+              <div
+                className={`inline-block p-2 rounded ${
+                  isOwnMessage ? 'bg-blue-100' : 'bg-gray-100'
+                }`}
+              >
+                {/* Text message */}
+                {msg.message && (
+                  <p className="text-sm">
+                    <span className="font-semibold mr-2">
+                      {isOwnMessage ? 'You' : 'Customer'}:
+                    </span>
+                    {msg.message}
+                  </p>
+                )}
+
+                {/* File preview */}
+                {msg.fileURL && (
+                  <div className="file-preview mt-2">
+                    {msg.fileType?.startsWith('image/') ? (
+                      <img 
+                        src={msg.fileURL} 
+                        alt={msg.fileName} 
+                        className="max-w-full h-auto rounded"
+                        onClick={() => window.open(msg.fileURL, '_blank')}
+                      />
+                    ) : (
+                      <a 
+                        href={msg.fileURL} 
+                        target="_blank" 
+                        rel="noopener noreferrer"
+                        className="text-blue-600 hover:underline"
+                      >
+                        Download {msg.fileName}
+                      </a>
+                    )}
+                  </div>
+                )}
+
+                <small className="text-gray-500 text-xs">
+                  {msg.timestamp instanceof Date
+                    ? msg.timestamp.toLocaleString()
+                    : new Date(msg.timestamp).toLocaleString()}
+                </small>
+              </div>
             </div>
-            <span className="timestamp">
-              {msg.timestamp instanceof Date 
-                ? msg.timestamp.toLocaleString() 
-                : new Date(msg.timestamp?.seconds * 1000).toLocaleString()}
-            </span>
-          </div>
-        ))} */}
-        {messages.map(msg => (
-  <div
-    key={msg.id}
-    className={`mb-4 ${
-      msg.senderId === currentUser?.uid
-        ? 'text-right'
-        : 'text-left'
-    }`}
-  >
-    <div
-      className={`inline-block p-2 rounded ${
-        msg.senderId === currentUser?.uid
-          ? 'bg-blue-100'
-          : 'bg-gray-100'
-      }`}
-    >
-      <p className="text-sm">
-        <span className="font-semibold mr-2">
-          {msg.senderId === currentUser?.uid ? 'You' : 'Support'}:
-        </span>
-        {msg.message}
-      </p>
-      <small className="text-gray-500 text-xs">
-        {msg.timestamp instanceof Date
-          ? msg.timestamp.toLocaleString()
-          : new Date(msg.timestamp).toLocaleString()}
-      </small>
-    </div>
-  </div>
-))}
+          );
+        })}
+      
 
       </div>
 
